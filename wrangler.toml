@@ -1,0 +1,51 @@
+name = "nightflare"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Static web UI (dashboard, treatments, profile editor, admin/import).
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/pebble", "/pebble/*", "/rt", "/rt/*"]
+
+# Primary datastore: entries, treatments, devicestatus, profile, food, activity, auth.
+[[d1_databases]]
+binding = "DB"
+database_name = "nightflare-db"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+# Small key/value lookups: site settings cache, short-lived import job state, JWT denylist.
+[[kv_namespaces]]
+binding = "SETTINGS_KV"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# One Durable Object instance per deployed site, fans out realtime updates to connected browsers.
+[[durable_objects.bindings]]
+name = "REALTIME"
+class_name = "RealtimeHub"
+
+# One Durable Object instance per import job; uses alarms to pull data from
+# a source Nightscout instance in paginated batches, well outside any
+# single HTTP request's time budget.
+[[durable_objects.bindings]]
+name = "IMPORT_JOB"
+class_name = "ImportJob"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RealtimeHub", "ImportJob"]
+
+[vars]
+# Display name shown in the web UI header.
+SITE_TITLE = "Nightflare"
+# Comma-separated list of enabled "plugins" surfaced to the client (mirrors Nightscout ENABLE env var).
+ENABLE = "careportal rawbg iob cob bwp basal ar2 delta direction upbat"
+# Units used for display: "mg/dl" or "mmol/L".
+DISPLAY_UNITS = "mg/dl"
+
+# Secrets (set with `wrangler secret put API_SECRET`), not committed:
+#   API_SECRET - plaintext master secret; clients send sha1(API_SECRET) as the api-secret header,
+#                exactly like stock Nightscout. The web UI hashes it client-side before sending too.
