@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Env } from "../types";
 import { authenticate } from "../lib/auth";
-import { sha1Hex, sha256Hex, randomToken } from "../lib/crypto";
+import { sha1Hex } from "../lib/crypto";
 import { generateId } from "../lib/id";
 
 export const adminRoute = new Hono<{ Bindings: Env }>();
@@ -83,47 +83,6 @@ adminRoute.get("/import", async (c) => {
   );
 });
 
-// --- Subjects & roles (API client management) ------------------------------
-
-adminRoute.get("/subjects", async (c) => {
-  const { results } = await c.env.DB.prepare("SELECT id, name, role_names, notes, created_at FROM auth_subjects").all<
-    Record<string, string>
-  >();
-  return c.json(
-    (results ?? []).map(({ role_names, ...r }) => ({ ...r, roles: JSON.parse(role_names) }))
-  );
-});
-
-adminRoute.post("/subjects", async (c) => {
-  const body = await c.req.json<{ name?: string; roles?: string[]; notes?: string }>();
-  if (!body.name || !body.roles?.length) return c.json({ status: 400, message: "name and roles are required" }, 400);
-
-  const id = generateId();
-  const accessToken = randomToken();
-  const accessTokenHash = await sha256Hex(accessToken);
-  await c.env.DB.prepare("INSERT INTO auth_subjects (id, name, role_names, access_token_hash, notes) VALUES (?, ?, ?, ?, ?)")
-    .bind(id, body.name, JSON.stringify(body.roles), accessTokenHash, body.notes ?? null)
-    .run();
-
-  // The plaintext token is only ever shown once, at creation time.
-  return c.json({ id, name: body.name, roles: body.roles, accessToken }, 201);
-});
-
-adminRoute.delete("/subjects/:id", async (c) => {
-  await c.env.DB.prepare("DELETE FROM auth_subjects WHERE id = ?").bind(c.req.param("id")).run();
-  return c.body(null, 204);
-});
-
-adminRoute.get("/roles", async (c) => {
-  const { results } = await c.env.DB.prepare("SELECT name, permissions, notes FROM auth_roles").all<Record<string, string>>();
-  return c.json((results ?? []).map((r) => ({ ...r, permissions: JSON.parse(r.permissions) })));
-});
-
-adminRoute.post("/roles", async (c) => {
-  const body = await c.req.json<{ name?: string; permissions?: string[]; notes?: string }>();
-  if (!body.name || !body.permissions?.length) return c.json({ status: 400, message: "name and permissions are required" }, 400);
-  await c.env.DB.prepare("INSERT OR REPLACE INTO auth_roles (name, permissions, notes) VALUES (?, ?, ?)")
-    .bind(body.name, JSON.stringify(body.permissions), body.notes ?? null)
-    .run();
-  return c.json({ name: body.name, permissions: body.permissions, notes: body.notes ?? null }, 201);
-});
+// Subject/role (API client) management lives at /api/v2/authorization/* —
+// see routes/authorization2.ts — matching the contract Nightscout's real,
+// vendored admin UI (admin_plugins/subjects.js, roles.js) already expects.

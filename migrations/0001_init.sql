@@ -60,10 +60,14 @@ CREATE TABLE activity (
 );
 CREATE INDEX idx_activity_date ON activity(date DESC);
 
--- Auth: mirrors Nightscout's subject/role model (roles hold permission
--- patterns like "*", "readable", "careportal", "admin"; subjects hold a
--- hashed access token and a list of role names).
+-- Auth: mirrors Nightscout's subject/role model, matching the REST contract
+-- its real admin UI (admin_plugins/subjects.js, roles.js) expects at
+-- /api/v2/authorization/*. Subjects don't store a token at all: it's
+-- derived deterministically from `id` + the deployment's API_SECRET at read
+-- time (see lib/auth.ts deriveAccessToken), so it's stable, never persisted,
+-- and rotates automatically if the secret changes.
 CREATE TABLE auth_roles (
+  id TEXT,                        -- null for the built-in default roles (not user-deletable)
   name TEXT PRIMARY KEY,
   permissions TEXT NOT NULL,      -- JSON array of permission patterns
   notes TEXT
@@ -73,16 +77,19 @@ CREATE TABLE auth_subjects (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   role_names TEXT NOT NULL,       -- JSON array of auth_roles.name
-  access_token_hash TEXT,         -- sha256 hex of the issued token
   notes TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
-CREATE UNIQUE INDEX idx_auth_subjects_token ON auth_subjects(access_token_hash);
 
-INSERT INTO auth_roles (name, permissions, notes) VALUES
-  ('admin', '["*"]', 'Full access to everything'),
-  ('readable', '["api:*:read","*:*:read"]', 'Read-only access to all collections'),
-  ('careportal', '["api:treatments:create","api:treatments:read","api:treatments:update","*:*:read"]', 'Can log treatments via Care Portal');
+-- Matches Nightscout's own built-in default role set exactly (storage.defaultRoles).
+INSERT INTO auth_roles (id, name, permissions, notes) VALUES
+  (NULL, 'admin', '["*"]', 'Full access to everything'),
+  (NULL, 'denied', '[]', 'No access'),
+  (NULL, 'status-only', '["api:status:read"]', 'Can only read server status'),
+  (NULL, 'readable', '["*:*:read"]', 'Read-only access to all collections'),
+  (NULL, 'careportal', '["api:treatments:create"]', 'Can log treatments via Care Portal'),
+  (NULL, 'devicestatus-upload', '["api:devicestatus:create"]', 'Can upload device status'),
+  (NULL, 'activity', '["api:activity:create"]', 'Can upload activity records');
 
 -- Import jobs: track a bulk pull from another Nightscout instance.
 CREATE TABLE import_jobs (

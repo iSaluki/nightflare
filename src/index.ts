@@ -7,8 +7,9 @@ import { devicestatusRoute } from "./routes/devicestatus";
 import { profileRoute } from "./routes/profile";
 import { foodRoute } from "./routes/food";
 import { activityRoute } from "./routes/activity";
-import { statusRoute, verifyAuthRoute } from "./routes/status";
+import { statusRoute, verifyAuthRoute, adminNotifiesRoute } from "./routes/status";
 import { adminRoute } from "./routes/admin";
+import { authorization2Route } from "./routes/authorization2";
 import { pebbleRoute } from "./routes/pebble";
 import { realtimeRoute } from "./routes/realtime";
 
@@ -29,7 +30,9 @@ app.route("/api/v1/food", foodRoute);
 app.route("/api/v1/activity", activityRoute);
 app.route("/api/v1/status", statusRoute);
 app.route("/api/v1/verifyauth", verifyAuthRoute);
+app.route("/api/v1/adminnotifies", adminNotifiesRoute);
 app.route("/api/v1/admin", adminRoute);
+app.route("/api/v2/authorization", authorization2Route);
 app.route("/pebble", pebbleRoute);
 app.route("/rt", realtimeRoute);
 
@@ -38,12 +41,23 @@ app.notFound((c) => c.json({ status: 404, message: "Not found" }, 404));
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    let rewritten = false;
+
     // Nightscout clients commonly request e.g. /api/v1/entries.json; strip
     // the extension so both spellings hit the same routes.
     if (url.pathname.startsWith("/api/") && url.pathname.endsWith(".json")) {
       url.pathname = url.pathname.slice(0, -".json".length);
-      request = new Request(url.toString(), request);
+      rewritten = true;
     }
+    // The vendored client itself posts to e.g. /api/v1/treatments/ and
+    // /api/v2/authorization/subjects/ with a trailing slash; our routes are
+    // mounted without one.
+    if (url.pathname.length > 1 && url.pathname.endsWith("/")) {
+      url.pathname = url.pathname.slice(0, -1);
+      rewritten = true;
+    }
+
+    if (rewritten) request = new Request(url.toString(), request);
     return app.fetch(request, env, ctx);
   },
 };

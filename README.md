@@ -1,103 +1,101 @@
 # Nightflare
 
-A [Nightscout](https://nightscout.github.io/)-compatible CGM data platform that runs **entirely
-on Cloudflare's serverless platform** — no VM, no MongoDB, no Node server to babysit.
+[Nightscout](https://nightscout.github.io/), running **entirely on Cloudflare's serverless
+platform** — no VM, no MongoDB, no Node server to babysit — with the real, unmodified
+Nightscout dashboard, careportal, profile/food editors, reports, and admin tools, all built
+around a from-scratch backend on Workers, D1, KV, and Durable Objects.
 
-| Nightscout (stock)        | Nightflare                          |
-|----------------------------|--------------------------------------|
-| Node/Express server        | Cloudflare Worker (Hono)             |
-| MongoDB                    | D1 (SQLite)                          |
-| In-memory settings cache   | Workers KV                           |
-| socket.io realtime push    | Durable Object + WebSocket Hibernation |
-| Background/cron jobs       | Durable Object alarms                |
-| Static frontend bundle     | Workers Static Assets                |
+## What this actually is
 
-## Why this exists
+Nightscout's *server* (Node/Express + MongoDB, socket.io, cron jobs) can't run in Workers —
+there's no long-lived process, no TCP server, no MongoDB driver. So Nightflare replaces the
+server with a purpose-built one, but keeps the *client* — the actual dashboard code everyone
+interacts with — genuinely unmodified, vendored straight from
+[nightscout/cgm-remote-monitor](https://github.com/nightscout/cgm-remote-monitor). See
+[`client/README.md`](client/README.md) for exactly what's vendored and how it's built.
 
-Nightscout is normally deployed on a VM, Heroku dyno, or Docker host talking to a MongoDB
-instance. Nightflare reimplements the same **client-facing REST API** (the part every uploader —
-xDrip+, Loop, AAPS, Spike — and every follower app actually depends on) on top of Cloudflare's
-managed primitives, so the whole thing scales to zero and costs nothing to run for a single user.
+| Nightscout (stock)         | Nightflare                                    |
+|-----------------------------|------------------------------------------------|
+| Node/Express server         | Cloudflare Worker (Hono)                       |
+| MongoDB                     | D1 (SQLite)                                    |
+| socket.io realtime push     | Durable Object + a small WebSocket JSON protocol, with a client-side shim standing in for the socket.io-client library |
+| Cron / background jobs      | Durable Object alarms                          |
+| Client dashboard/UI         | **The real Nightscout client bundle, vendored unmodified** |
+
+## Feature coverage
+
+Because the real client ships unmodified, all of its REST/WebSocket-driven features work as
+long as the backend speaks the right protocol — which is most of what a single-user deployment
+actually uses:
+
+- **Live dashboard**: BG graph, IOB/COB/BWP/basal pills, alarms, careportal drawer — pushed
+  live over WebSocket (`RealtimeHub` Durable Object), not polled.
+- **Careportal**: logging treatments (meals, boluses, site changes, etc.) via the real drawer UI.
+- **Profile editor** (`/profile`), **food editor** (`/food`), **reports** (`/report`, including
+  day-to-day, distribution, percentile charts, and the loop analyzer) — all call the standard
+  REST API and work unmodified.
+- **Admin tools** (`/admin`): subject/role (API token) management and stale-data cleanup, via
+  the real `admin_plugins` UI against a `/api/v2/authorization/*` implementation matching
+  Nightscout's own contract.
+- **REST API v1**: `entries`, `treatments`, `devicestatus`, `profile`, `food`, `activity`,
+  `status`, `verifyauth`, the legacy `/pebble` watchface endpoint, and Mongo-style
+  `find[field][$op]=value` queries (via SQLite's `json_extract`) — so xDrip+, Loop, AAPS, Spike,
+  and any other Nightscout-speaking app work against a Nightflare deployment unmodified for both
+  upload and download.
+- **Auth**: `api-secret: sha1(API_SECRET)` header, exactly like stock Nightscout, plus scoped
+  per-client tokens with role-based permissions (`admin`/`readable`/`careportal`/custom) —
+  tokens are derived deterministically from a subject's id + `API_SECRET` (never stored raw),
+  matching the "click the token to get a shareable link" UX of Nightscout's real admin UI.
+- **Import from an existing Nightscout instance**: a Nightflare-specific addition (`/import`,
+  linked from `/admin`) that pulls entries/treatments/devicestatus/profile/food/activity from
+  another Nightscout site's REST API, given its URL and `API_SECRET`. Runs as a Durable Object
+  alarm loop in paginated batches, so it comfortably handles years of history well outside any
+  single request's time budget.
+
+### What's genuinely out of scope
+
+A few Nightscout features need infrastructure that doesn't make sense — or doesn't exist — in a
+serverless, single-tenant Workers deployment, so they're left out rather than half-implemented:
+
+- **Pushover / Apple Push (APN) notifications** and the **Alexa / Google Home** skills need
+  persistent third-party OAuth credentials and, in APN's case, a long-lived certificate-based
+  connection — infrastructure a personal Workers deployment has no good place to hold.
+- **Server-computed OpenAPS/Loop plugin calculations** beyond storing/serving `devicestatus` as
+  uploaded: real Nightscout mostly treats these as pass-through anyway (the looping app computes
+  IOB/COB and uploads the result), which Nightflare already does.
+- Real-time **alarm-acknowledgement sync across multiple simultaneous viewers** (the `/alarm`
+  socket.io namespace) is acked but not implemented — each browser tab manages its own alarm
+  state, same as if two people had two different stock Nightscout tabs open with no shared
+  alarm-silence state.
 
 ## Architecture
 
 ```
-                       ┌─────────────────────────────┐
- xDrip+ / Loop / AAPS  │                              │
- follower apps  ──────►│   Cloudflare Worker (Hono)   │
- web dashboard         │   /api/v1/*  /pebble  /rt    │
-                       └───────┬───────────┬──────────┘
-                               │           │
-                    ┌──────────▼───┐   ┌───▼────────────────┐
-                    │  D1 (SQLite) │   │  Durable Objects    │
-                    │  entries     │   │  RealtimeHub (WS)   │
-                    │  treatments  │   │  ImportJob (alarm-  │
-                    │  devicestatus│   │  driven background  │
-                    │  profiles    │   │  pull from another  │
-                    │  food        │   │  Nightscout site)   │
-                    │  activity    │   └─────────────────────┘
-                    │  auth_*      │
-                    │  import_jobs │
-                    └──────────────┘
+                       ┌──────────────────────────────┐
+ xDrip+ / Loop / AAPS  │                               │
+ follower apps  ──────►│   Cloudflare Worker (Hono)    │◄──── real Nightscout
+ real Nightscout UI    │   /api/v1/*  /api/v2/*  /rt   │      client bundle
+ (vendored, unmodified)│   /pebble                     │      (public/, built
+                       └───────┬────────────┬──────────┘       from client/)
+                               │            │
+                    ┌──────────▼───┐   ┌────▼─────────────────┐
+                    │  D1 (SQLite) │   │  Durable Objects       │
+                    │  entries     │   │  RealtimeHub — speaks  │
+                    │  treatments  │   │  a small WS protocol   │
+                    │  devicestatus│   │  the vendored client's │
+                    │  profiles    │   │  io-shim.js talks to   │
+                    │  food        │   │                        │
+                    │  activity    │   │  ImportJob — alarm-    │
+                    │  auth_*      │   │  driven background     │
+                    │  import_jobs │   │  pull from another     │
+                    └──────────────┘   │  Nightscout site       │
+                                       └─────────────────────────┘
 ```
 
 Each D1 table keeps a few indexed columns (`date`, `type`/`eventType`, `device`) for fast
 range/sort queries, plus a `data` JSON column holding the document exactly as received — so
-uploader-specific fields are never dropped, and `find[field][$op]=value` queries (the Mongo-style
-syntax every Nightscout client already speaks) work against arbitrary fields via SQLite's `json_extract`.
-
-## API compatibility
-
-Implements the Nightscout API v1 surface that the client ecosystem actually relies on:
-
-- `GET/POST/PUT/DELETE /api/v1/entries[.json]`, plus `/entries/current`, `/entries/sgv`, `/entries/mbg`, `/entries/cal`
-- `GET/POST/PUT/DELETE /api/v1/treatments[.json]` (bulk-array POST supported, for uploader batching)
-- `GET/POST/PUT/DELETE /api/v1/devicestatus[.json]`
-- `GET/POST/PUT/DELETE /api/v1/profile[.json]`, plus `/profile/current`
-- `GET/POST/PUT/DELETE /api/v1/food[.json]`, `/api/v1/activity[.json]`
-- `GET /api/v1/status.json`, `GET /api/v1/verifyauth`
-- `GET /pebble` (legacy watchface endpoint)
-- Mongo-style querying: `find[date][$gte]=...`, `find[type]=sgv`, `count=N`, etc.
-- Auth: `api-secret: sha1(API_SECRET)` header (byte-for-byte the same scheme Nightscout uses), plus
-  scoped per-client tokens with role-based permissions (`admin`, `readable`, `careportal`, or custom
-  roles) — see the **Admin** tab in the web UI.
-- Realtime: dashboards get push updates over a `/rt` WebSocket instead of socket.io.
-
-### Known gaps vs. stock Nightscout
-
-This is a from-scratch reimplementation, not a port of the original codebase, so it does **not**
-include: the original AngularJS admin/report plugins (day-to-day, week-to-week, distribution
-reports), Care Portal's full form catalog, or the OpenAPS/Loop-specific plugin computations
-(IOB/COB curves) — those are computed client-side by the uploader/looping apps themselves and
-just stored/served as-is here, which is how most of the ecosystem actually consumes Nightscout.
-The web UI here is a clean custom dashboard (BG graph, treatments log, profile editor, admin) built
-for this project rather than a vendored copy of Nightscout's legacy frontend bundle.
-
-## Importing from an existing Nightscout instance
-
-Admin tab → **Import from another Nightscout instance** → enter the source site's URL and its
-`API_SECRET` (used only to authenticate the pull; it's hashed before being sent and never stored).
-Or call the API directly:
-
-```bash
-curl -X POST https://your-site.workers.dev/api/v1/admin/import \
-  -H "api-secret: $(printf '%s' "$API_SECRET" | sha1sum | cut -d' ' -f1)" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "sourceUrl": "https://my-old-nightscout.herokuapp.com",
-    "apiSecret": "the-old-sites-api-secret",
-    "collections": ["entries", "treatments", "devicestatus", "profile", "food", "activity"]
-  }'
-```
-
-This returns a `jobId` immediately; the import itself runs in the background as a Durable Object
-(`ImportJob`) driven by alarms, paging through the source's REST API 500 records at a time — so it
-comfortably handles years of CGM history without hitting any single-request time limit. Poll
-progress with:
-
-```bash
-curl https://your-site.workers.dev/api/v1/admin/import/<jobId> -H "api-secret: ..."
-```
+uploader-specific fields are never dropped, and `find[field][$op]=value` queries work against
+arbitrary fields via `json_extract`.
 
 ## Deploying
 
@@ -105,6 +103,8 @@ curl https://your-site.workers.dev/api/v1/admin/import/<jobId> -H "api-secret: .
 
 ```bash
 npm install
+npm run build:client   # builds the vendored client bundle into public/ (already committed,
+                        # only needed again if you change client/)
 ```
 
 ### 2. Create the D1 database and KV namespace
@@ -147,22 +147,42 @@ npm run db:migrate:local
 npm run dev
 ```
 
+## Importing from an existing Nightscout instance
+
+Visit `/admin` → **Import from another Nightscout instance**, or call the API directly:
+
+```bash
+curl -X POST https://your-site.workers.dev/api/v1/admin/import \
+  -H "api-secret: $(printf '%s' "$API_SECRET" | sha1sum | cut -d' ' -f1)" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sourceUrl": "https://my-old-nightscout.herokuapp.com",
+    "apiSecret": "the-old-sites-api-secret",
+    "collections": ["entries", "treatments", "devicestatus", "profile", "food", "activity"]
+  }'
+```
+
+Poll progress with `GET /api/v1/admin/import/<jobId>` (the POST above returns the `jobId`).
+
 ## Project layout
 
 ```
 src/
-  index.ts                  Worker entry point, routing, .json suffix handling
+  index.ts                  Worker entry point, routing, .json/trailing-slash normalization
   types.ts                  Env bindings (D1/KV/DO/Assets)
   lib/
-    auth.ts                 api-secret + subject-token authentication, permission checks
+    auth.ts                 api-secret + subject-token + JWT authentication, permission checks
+    jwt.ts                  minimal HS256 JWT (Web Crypto), for the token → session exchange
     collection-route.ts     generic CRUD route factory shared by all collections
     mongo-query.ts          find[field][$op]=value  ->  SQL WHERE
     crypto.ts, id.ts, realtime.ts
   db/                       D1 access layer (one Collection per Nightscout collection)
   durable-objects/
-    realtime-hub.ts         WebSocket fan-out for live dashboard updates
+    realtime-hub.ts         WebSocket protocol: authorize/dataUpdate/loadRetro/dbAdd/dbUpdate
     import-job.ts           alarm-driven background import from another Nightscout site
-  routes/                   one file per API resource
+  routes/                   one file per API resource (entries, treatments, status, admin, ...)
 migrations/                 D1 schema
-public/                     static web UI (dashboard, treatments, profile, admin) — no build step
+client/                     vendored Nightscout client source + build tooling — see client/README.md
+public/                     built static assets served by the Worker (the vendored UI + our own
+                             io-shim.js and import.html)
 ```

@@ -2,7 +2,8 @@
   "name": "nightflare",
   "version": "0.1.0",
   "private": true,
-  "description": "Nightscout-compatible CGM data platform running entirely on Cloudflare Workers (Workers + D1 + KV + Durable Objects)",
+  "license": "AGPL-3.0",
+  "description": "Nightscout-compatible CGM data platform running entirely on Cloudflare Workers (Workers + D1 + KV + Durable Objects), built around the real, unmodified Nightscout client bundle",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
@@ -10,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "db:migrate:local": "wrangler d1 migrations apply nightflare-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply nightflare-db --remote",
+    "build:client": "cd client && npm install && node prerender.js && npx webpack --mode production --config webpack/webpack.config.js",
     "test": "vitest run"
   },
   "devDependencies": {

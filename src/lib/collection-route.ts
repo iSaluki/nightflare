@@ -1,3 +1,4 @@
+import type { Context } from "hono";
 import { Hono } from "hono";
 import type { Env } from "../types";
 import { authenticate, can } from "./auth";
@@ -13,6 +14,50 @@ interface Options {
 }
 
 function stripInternal(doc: DocBase): DocBase {
+  return doc;
+}
+
+// Fields Nightscout's own server coerces to numbers (lib/server/treatments.js
+// prepareData, entries normalization) — needed because the vendored
+// careportal drawer, boluscalc, and profile editor all submit plain
+// `application/x-www-form-urlencoded` bodies (jQuery's $.ajax default for a
+// plain object), not JSON, so every value arrives as a string.
+const NUMERIC_FIELDS = new Set([
+  "sgv",
+  "mbg",
+  "glucose",
+  "targetTop",
+  "targetBottom",
+  "carbs",
+  "protein",
+  "fat",
+  "insulin",
+  "duration",
+  "percent",
+  "absolute",
+  "relative",
+  "rate",
+  "preBolus",
+  "profile_offset",
+]);
+
+/** Accepts both JSON (native API clients) and form-encoded bodies (the
+ * vendored web UI) transparently. */
+async function parseRequestBody(c: Context<{ Bindings: Env }>): Promise<DocBase | DocBase[]> {
+  const contentType = c.req.header("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return c.req.json<DocBase | DocBase[]>();
+  }
+  const form = (await c.req.parseBody({ all: true })) as Record<string, unknown>;
+  const doc: DocBase = {};
+  for (const [key, value] of Object.entries(form)) {
+    if (NUMERIC_FIELDS.has(key)) {
+      const num = Number(value);
+      if (Number.isFinite(num)) doc[key] = num;
+    } else {
+      doc[key] = value;
+    }
+  }
   return doc;
 }
 
@@ -41,15 +86,16 @@ export function collectionRoute(opts: Options): Hono<{ Bindings: Env }> {
     const auth = await authenticate(c);
     if (!can(auth, perm("create"))) return c.json({ status: 401, message: "Unauthorized" }, 401);
     const col = opts.getCollection(c.env.DB);
-    const body = await c.req.json<DocBase | DocBase[]>();
+    const body = await parseRequestBody(c);
     let result: DocBase | DocBase[];
     if (Array.isArray(body)) {
       if (!opts.allowBulkInsert) return c.json({ status: 400, message: "Bulk insert not supported" }, 400);
       result = await col.insertMany(body);
+      for (const doc of result) await notifyChange(c.env, opts.name, "create", doc);
     } else {
       result = await col.insert(body);
+      await notifyChange(c.env, opts.name, "create", result);
     }
-    await notifyChange(c.env, opts.name, "create");
     return c.json(result, 201);
   });
 
@@ -57,10 +103,10 @@ export function collectionRoute(opts: Options): Hono<{ Bindings: Env }> {
     const auth = await authenticate(c);
     if (!can(auth, perm("update"))) return c.json({ status: 401, message: "Unauthorized" }, 401);
     const col = opts.getCollection(c.env.DB);
-    const body = await c.req.json<DocBase>();
+    const body = (await parseRequestBody(c)) as DocBase;
     if (!body._id) return c.json({ status: 400, message: "_id is required for update" }, 400);
     const result = await col.update(body._id, body);
-    await notifyChange(c.env, opts.name, "update");
+    await notifyChange(c.env, opts.name, "update", result);
     return c.json(result);
   });
 
@@ -68,9 +114,9 @@ export function collectionRoute(opts: Options): Hono<{ Bindings: Env }> {
     const auth = await authenticate(c);
     if (!can(auth, perm("update"))) return c.json({ status: 401, message: "Unauthorized" }, 401);
     const col = opts.getCollection(c.env.DB);
-    const body = await c.req.json<DocBase>();
+    const body = (await parseRequestBody(c)) as DocBase;
     const result = await col.update(c.req.param("id"), body);
-    await notifyChange(c.env, opts.name, "update");
+    await notifyChange(c.env, opts.name, "update", result);
     return c.json(result);
   });
 
@@ -78,8 +124,9 @@ export function collectionRoute(opts: Options): Hono<{ Bindings: Env }> {
     const auth = await authenticate(c);
     if (!can(auth, perm("delete"))) return c.json({ status: 401, message: "Unauthorized" }, 401);
     const col = opts.getCollection(c.env.DB);
-    await col.deleteById(c.req.param("id"));
-    await notifyChange(c.env, opts.name, "delete");
+    const id = c.req.param("id");
+    await col.deleteById(id);
+    await notifyChange(c.env, opts.name, "delete", { _id: id });
     return c.body(null, 204);
   });
 
@@ -88,7 +135,6 @@ export function collectionRoute(opts: Options): Hono<{ Bindings: Env }> {
     if (!can(auth, perm("delete"))) return c.json({ status: 401, message: "Unauthorized" }, 401);
     const col = opts.getCollection(c.env.DB);
     const deleted = await col.deleteWhere(new URL(c.req.url).searchParams);
-    await notifyChange(c.env, opts.name, "delete");
     return c.json({ deleted });
   });
 

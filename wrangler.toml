@@ -3,11 +3,13 @@ main = "src/index.ts"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Static web UI (dashboard, treatments, profile editor, admin/import).
+# Web UI: the vendored (unmodified) Nightscout client bundle + pre-rendered
+# page shells (index/admin/food/profile/report), served as plain static
+# multi-page assets — not an SPA.
 [assets]
 directory = "./public"
 binding = "ASSETS"
-not_found_handling = "single-page-application"
+not_found_handling = "404-page"
 run_worker_first = ["/api/*", "/pebble", "/pebble/*", "/rt", "/rt/*"]
 
 # Primary datastore: entries, treatments, devicestatus, profile, food, activity, auth.
