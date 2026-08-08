@@ -38,7 +38,7 @@ class_name = "ImportJob"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["RealtimeHub", "ImportJob"]
+new_sqlite_classes = ["RealtimeHub", "ImportJob"]
 
 [vars]
 # Display name shown in the web UI header.
