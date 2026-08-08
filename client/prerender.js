@@ -70,6 +70,21 @@ for (const page of pages) {
 
   html = html.replace('<body>', '<body>' + errorOverlayScript);
 
+  // The vendored views never declare a document charset, and Cloudflare's
+  // static-asset serving doesn't add `charset=utf-8` to the Content-Type
+  // header the way Express's `express.static` (stock Nightscout's server)
+  // always did. Without either signal, a browser's encoding guess is
+  // locale-dependent — and since a same-origin <script src> with no
+  // charset of its own inherits its containing document's encoding, a
+  // non-UTF-8 guess corrupts the multi-byte characters embedded in
+  // bundle.app.js (e.g. moment.js's non-English locale strings) into
+  // invalid syntax, throwing a SyntaxError before `window.Nightscout` is
+  // even defined — silently, since nothing ever updates the loading
+  // screen after that. Must be the first thing in <head>, per the HTML
+  // spec's requirement that the charset declaration appear within the
+  // first 1024 bytes of the document.
+  html = html.replace('<head>', '<head>\n  <meta charset="utf-8">');
+
   // Our RealtimeHub Durable Object speaks a small JSON-envelope protocol
   // instead of full socket.io/engine.io — swap in our shim, which exposes
   // the same `io.connect()` surface the bundle expects (see io-shim.js).
