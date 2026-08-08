@@ -15,8 +15,17 @@ const outDir = path.join(__dirname, '..', 'public');
 // Flat .html filenames so Cloudflare's default asset html_handling
 // ("auto-trailing-slash") serves them at clean extensionless URLs, e.g.
 // GET /admin -> public/admin.html.
+//
+// The root dashboard is named `dashboard-classic.html`, NOT `index.html`:
+// our Worker fetches it internally by exact path (src/index.ts's "/"
+// handler, to pick between this and the new UI based on NEW_UI), and
+// Cloudflare's asset binding unconditionally 307-redirects any request for
+// a literal `index.html`/`*.html` filename to its canonical extensionless
+// URL — including internal env.ASSETS.fetch() calls — so fetching
+// "/index.html" from inside the Worker would just loop back to "/".
+// Fetching the already-canonical "/dashboard-classic" avoids that.
 const pages = [
-  { file: 'index.html', out: 'index.html', type: 'index', title: '' },
+  { file: 'index.html', out: 'dashboard-classic.html', type: 'index', title: '' },
   { file: 'adminindex.html', out: 'admin.html', type: 'admin', title: 'Admin Tools' },
   { file: 'foodindex.html', out: 'food.html', type: 'food', title: 'Food Editor' },
   { file: 'profileindex.html', out: 'profile.html', type: 'profile', title: 'Profile Editor' },
