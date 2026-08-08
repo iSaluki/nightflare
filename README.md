@@ -5,6 +5,14 @@ platform** — no VM, no MongoDB, no Node server to babysit — with the real, u
 Nightscout dashboard, careportal, profile/food editors, reports, and admin tools, all built
 around a from-scratch backend on Workers, D1, KV, and Durable Objects.
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/iSaluki/nightflare)
+
+Deploying this way forks the repo into your own GitHub account, provisions the D1 database, KV
+namespace, and Durable Objects declared in `wrangler.toml` on your Cloudflare account, and
+deploys. You'll still need to set `API_SECRET` yourself afterwards — see
+[Set your API secret](#4-set-your-api-secret) below — the button can't safely generate and hand
+you back a real secret.
+
 ## What this actually is
 
 Nightscout's *server* (Node/Express + MongoDB, socket.io, cron jobs) can't run in Workers —
@@ -51,6 +59,29 @@ actually uses:
   another Nightscout site's REST API, given its URL and `API_SECRET`. Runs as a Durable Object
   alarm loop in paginated batches, so it comfortably handles years of history well outside any
   single request's time budget.
+
+## Optional: a modern dashboard (`NEW_UI`)
+
+Set the `NEW_UI` variable in `wrangler.toml` (or `wrangler deploy --var NEW_UI:true`) to `"true"`
+to replace the dashboard at `/` with Nightflare's own UI — a from-scratch design (see
+`public/new-ui/`) rather than the vendored Nightscout client. It talks to the same REST API and
+the same `RealtimeHub` WebSocket protocol directly (no socket.io shim involved), so live updates,
+authentication, and logging a treatment all work the same way, just with a different look:
+
+- A calmer, instrument-panel visual language (a cool graphite base, a single muted accent per
+  glucose zone, a smoothed waveform graph) instead of the classic dark/neon CGM-dashboard look.
+- A vertical timeline for treatments, since the data is inherently a timeline.
+- Honest, simply-computed stats (carbs/insulin logged in the last 24h, time since last entry) —
+  it does **not** attempt to reproduce IOB/COB decay curves; showing an incorrectly-modeled
+  insulin-on-board number would be actively misleading, so that's left to the vendored UI/looping
+  apps that actually compute it correctly.
+
+**This only replaces the dashboard.** `/admin`, `/food`, `/profile`, and `/report` always stay on
+the vendored Nightscout UI regardless of `NEW_UI` — profile editing, reports, and admin tools
+aren't reimplemented here. `NEW_UI` is a deployment-wide setting, not a per-visitor toggle; both
+UIs are always deployed side by side (the vendored one stays reachable, unlisted, at
+`/dashboard-classic` and the new one at `/new-ui/dashboard`, whichever `NEW_UI` doesn't pick for
+`/`).
 
 ### What's genuinely out of scope
 
@@ -142,10 +173,13 @@ npm run deploy
 ### Local development
 
 ```bash
-echo 'API_SECRET="something-long-and-random"' > .dev.vars
+cp .dev.vars.example .dev.vars   # then edit in a real secret
 npm run db:migrate:local
 npm run dev
 ```
+
+To try the new dashboard locally without editing `wrangler.toml`:
+`npx wrangler dev --var NEW_UI:true`.
 
 ## Importing from an existing Nightscout instance
 
@@ -183,6 +217,8 @@ src/
   routes/                   one file per API resource (entries, treatments, status, admin, ...)
 migrations/                 D1 schema
 client/                     vendored Nightscout client source + build tooling — see client/README.md
-public/                     built static assets served by the Worker (the vendored UI + our own
-                             io-shim.js and import.html)
+public/                     static assets served by the Worker
+  dashboard-classic.html      the vendored Nightscout dashboard (built from client/)
+  new-ui/                     Nightflare's own dashboard (see "Optional: a modern dashboard" above)
+  io-shim.js, import.html     Nightflare-specific additions
 ```

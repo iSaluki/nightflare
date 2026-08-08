@@ -12,4 +12,5 @@ export interface Env {
   SITE_TITLE: string;
   ENABLE: string;
   DISPLAY_UNITS: string;
+  NEW_UI: string;
 }

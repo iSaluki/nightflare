@@ -10,7 +10,7 @@ compatibility_flags = ["nodejs_compat"]
 directory = "./public"
 binding = "ASSETS"
 not_found_handling = "404-page"
-run_worker_first = ["/api/*", "/pebble", "/pebble/*", "/rt", "/rt/*"]
+run_worker_first = ["/", "/api/*", "/pebble", "/pebble/*", "/rt", "/rt/*"]
 
 # Primary datastore: entries, treatments, devicestatus, profile, food, activity, auth.
 [[d1_databases]]
@@ -47,6 +47,10 @@ SITE_TITLE = "Nightflare"
 ENABLE = "careportal rawbg iob cob bwp basal ar2 delta direction upbat"
 # Units used for display: "mg/dl" or "mmol/L".
 DISPLAY_UNITS = "mg/dl"
+# When "true", the root "/" dashboard serves Nightflare's own modern UI
+# instead of the vendored Nightscout client. Only the dashboard is affected —
+# /admin, /food, /profile, and /report always stay on the vendored UI.
+NEW_UI = "false"
 
 # Secrets (set with `wrangler secret put API_SECRET`), not committed:
 #   API_SECRET - plaintext master secret; clients send sha1(API_SECRET) as the api-secret header,

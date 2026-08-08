@@ -36,6 +36,18 @@ app.route("/api/v2/authorization", authorization2Route);
 app.route("/pebble", pebbleRoute);
 app.route("/rt", realtimeRoute);
 
+// The dashboard at "/" is the only page NEW_UI swaps — /admin, /food,
+// /profile, and /report always stay on the vendored Nightscout client.
+// Fetched by their already-canonical (extensionless) path: Cloudflare's
+// asset binding 307-redirects any literal "*.html" filename — including
+// index.html — to its canonical URL even for internal ASSETS.fetch() calls,
+// so fetching the canonical path directly is what actually returns content.
+app.get("/", async (c) => {
+  const url = new URL(c.req.url);
+  url.pathname = c.env.NEW_UI === "true" ? "/new-ui/dashboard" : "/dashboard-classic";
+  return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
+});
+
 app.notFound((c) => c.json({ status: 404, message: "Not found" }, 404));
 
 export default {

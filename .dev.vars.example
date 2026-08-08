@@ -1,0 +1,6 @@
+# Copy this to .dev.vars for local development (wrangler dev reads it automatically).
+# In production, set secrets with `wrangler secret put <NAME>` — never commit real values.
+
+# Master API secret. Every uploader/follower app authenticates by sending
+# sha1(API_SECRET) as the `api-secret` header, exactly like stock Nightscout.
+API_SECRET=change-me-to-a-long-random-string
