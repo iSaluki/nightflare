@@ -34,6 +34,32 @@ const pages = [
 
 const locals = { bundle: '/bundle', cachebuster: 'nightflare' };
 
+// Surfaces uncaught client-side errors directly on the loading screen.
+// Without this, a JS exception during boot leaves the page stuck on
+// "Loading the client" forever with no visible indication of what went
+// wrong — the only trace is the browser console, which isn't reachable on
+// e.g. mobile. Installed before any other script tag so it also catches
+// errors thrown while bundle.app.js/client.js are first evaluated.
+const errorOverlayScript = `
+<script>
+(function () {
+  function show(text) {
+    var panel = document.getElementById('centerMessagePanel');
+    var el = document.getElementById('loadingMessageText');
+    if (panel) { panel.style.display = ''; }
+    if (el) { el.textContent = 'Error: ' + text; }
+  }
+  window.addEventListener('error', function (e) {
+    show((e.error && (e.error.stack || e.error.message)) || e.message || 'unknown error');
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    show((r && (r.stack || r.message)) || String(r));
+  });
+})();
+</script>
+`;
+
 for (const page of pages) {
   let html = ejs.render(fs.readFileSync(path.join(viewsDir, page.file), 'utf8'), {
     locals,
@@ -41,6 +67,23 @@ for (const page of pages) {
     type: page.type,
     settings: {},
   }, { views: [viewsDir, path.join(viewsDir, 'partials')] });
+
+  html = html.replace('<body>', '<body>' + errorOverlayScript);
+
+  // The vendored views never declare a document charset, and Cloudflare's
+  // static-asset serving doesn't add `charset=utf-8` to the Content-Type
+  // header the way Express's `express.static` (stock Nightscout's server)
+  // always did. Without either signal, a browser's encoding guess is
+  // locale-dependent — and since a same-origin <script src> with no
+  // charset of its own inherits its containing document's encoding, a
+  // non-UTF-8 guess corrupts the multi-byte characters embedded in
+  // bundle.app.js (e.g. moment.js's non-English locale strings) into
+  // invalid syntax, throwing a SyntaxError before `window.Nightscout` is
+  // even defined — silently, since nothing ever updates the loading
+  // screen after that. Must be the first thing in <head>, per the HTML
+  // spec's requirement that the charset declaration appear within the
+  // first 1024 bytes of the document.
+  html = html.replace('<head>', '<head>\n  <meta charset="utf-8">');
 
   // Our RealtimeHub Durable Object speaks a small JSON-envelope protocol
   // instead of full socket.io/engine.io — swap in our shim, which exposes

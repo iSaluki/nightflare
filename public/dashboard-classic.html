@@ -2,6 +2,7 @@
 <html>
 
 <head>
+  <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, maximum-scale=1, initial-scale=0.9, user-scalable=0">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-startup-image" href="images/launch.png">
@@ -212,6 +213,24 @@
 </head>
 
 <body>
+<script>
+(function () {
+  function show(text) {
+    var panel = document.getElementById('centerMessagePanel');
+    var el = document.getElementById('loadingMessageText');
+    if (panel) { panel.style.display = ''; }
+    if (el) { el.textContent = 'Error: ' + text; }
+  }
+  window.addEventListener('error', function (e) {
+    show((e.error && (e.error.stack || e.error.message)) || e.message || 'unknown error');
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    show((r && (r.stack || r.message)) || String(r));
+  });
+})();
+</script>
+
   <div id="centerMessagePanel">
     <div id="loadingMessage">
       <p><img src="images/launch.png"></p>
