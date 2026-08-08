@@ -139,6 +139,24 @@
 
     </head>
   <body>
+<script>
+(function () {
+  function show(text) {
+    var panel = document.getElementById('centerMessagePanel');
+    var el = document.getElementById('loadingMessageText');
+    if (panel) { panel.style.display = ''; }
+    if (el) { el.textContent = 'Error: ' + text; }
+  }
+  window.addEventListener('error', function (e) {
+    show((e.error && (e.error.stack || e.error.message)) || e.message || 'unknown error');
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    show((r && (r.stack || r.message)) || String(r));
+  });
+})();
+</script>
+
     <div id="toolbar">
     <h1 class="customTitle">Nightscout</h1>
 

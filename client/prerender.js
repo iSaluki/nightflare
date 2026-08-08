@@ -34,6 +34,32 @@ const pages = [
 
 const locals = { bundle: '/bundle', cachebuster: 'nightflare' };
 
+// Surfaces uncaught client-side errors directly on the loading screen.
+// Without this, a JS exception during boot leaves the page stuck on
+// "Loading the client" forever with no visible indication of what went
+// wrong — the only trace is the browser console, which isn't reachable on
+// e.g. mobile. Installed before any other script tag so it also catches
+// errors thrown while bundle.app.js/client.js are first evaluated.
+const errorOverlayScript = `
+<script>
+(function () {
+  function show(text) {
+    var panel = document.getElementById('centerMessagePanel');
+    var el = document.getElementById('loadingMessageText');
+    if (panel) { panel.style.display = ''; }
+    if (el) { el.textContent = 'Error: ' + text; }
+  }
+  window.addEventListener('error', function (e) {
+    show((e.error && (e.error.stack || e.error.message)) || e.message || 'unknown error');
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    show((r && (r.stack || r.message)) || String(r));
+  });
+})();
+</script>
+`;
+
 for (const page of pages) {
   let html = ejs.render(fs.readFileSync(path.join(viewsDir, page.file), 'utf8'), {
     locals,
@@ -41,6 +67,8 @@ for (const page of pages) {
     type: page.type,
     settings: {},
   }, { views: [viewsDir, path.join(viewsDir, 'partials')] });
+
+  html = html.replace('<body>', '<body>' + errorOverlayScript);
 
   // Our RealtimeHub Durable Object speaks a small JSON-envelope protocol
   // instead of full socket.io/engine.io — swap in our shim, which exposes
