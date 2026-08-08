@@ -50,6 +50,18 @@ app.get("/", async (c) => {
 
 app.notFound((c) => c.json({ status: 404, message: "Not found" }, 404));
 
+// Without this, an uncaught exception anywhere in a route handler (e.g. a
+// D1 error) falls through to the Workers runtime's default plain-text
+// "Internal Server Error" response. Every client here — including the
+// vendored Nightscout UI and import.html — assumes JSON and calls
+// res.json() unconditionally, so that plain-text body surfaces as a
+// confusing "Unexpected token 'I' ... is not valid JSON" instead of the
+// real error.
+app.onError((err, c) => {
+  console.error(err);
+  return c.json({ status: 500, message: err instanceof Error ? err.message : "Internal server error" }, 500);
+});
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
