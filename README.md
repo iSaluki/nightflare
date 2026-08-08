@@ -8,8 +8,9 @@ around a from-scratch backend on Workers, D1, KV, and Durable Objects.
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/iSaluki/nightflare)
 
 Deploying this way forks the repo into your own GitHub account, provisions the D1 database, KV
-namespace, and Durable Objects declared in `wrangler.toml` on your Cloudflare account, and
-deploys. You'll still need to set `API_SECRET` yourself afterwards — see
+namespace, and Durable Objects declared in `wrangler.toml` on your Cloudflare account, applies
+the D1 migrations (via the `predeploy` script, so the `deploy` step below always runs against an
+up-to-date schema), and deploys. You'll still need to set `API_SECRET` yourself afterwards — see
 [Set your API secret](#4-set-your-api-secret) below — the button can't safely generate and hand
 you back a real secret.
 
@@ -153,6 +154,9 @@ Copy the `database_id` and KV `id` from the output into `wrangler.toml` (replaci
 ```bash
 npm run db:migrate:remote
 ```
+
+(`npm run deploy` in step 5 also runs this automatically via its `predeploy` hook, so this step
+is mostly useful if you want the schema in place before setting the API secret below.)
 
 ### 4. Set your API secret
 
