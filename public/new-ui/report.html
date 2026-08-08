@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nightflare — Report</title>
+<link rel="icon" type="image/png" href="/images/favicon-32x32.png" sizes="32x32">
+<link rel="stylesheet" href="/new-ui/app.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+      <circle cx="13" cy="13" r="12" stroke="var(--border-strong)" stroke-width="1"/>
+      <path class="wave-path" d="M3 14 L9 14 L11 8 L14 19 L16 11 L18 14 L23 14"
+        stroke="var(--zone-in)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </svg>
+    <span id="site-title">Nightflare</span>
+  </div>
+  <nav class="nav-links">
+    <a href="/">Dashboard</a>
+    <a href="/report" class="active">Report</a>
+    <a href="/profile">Profile</a>
+    <a href="/food">Food</a>
+    <a href="/admin">Admin</a>
+  </nav>
+  <div class="spacer"></div>
+  <button class="icon-btn" id="auth-btn" aria-label="Authenticate">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+  </button>
+</header>
+
+<main>
+  <div class="page-header">
+    <div>
+      <h1>Reports</h1>
+      <p>Time-in-range, averages, and day-by-day trends over a date range.</p>
+    </div>
+  </div>
+
+  <section class="card">
+    <div class="toolbar">
+      <div class="tabs" id="range-tabs">
+        <button data-days="1">Today</button>
+        <button data-days="3">3 days</button>
+        <button data-days="7" class="active">7 days</button>
+        <button data-days="14">14 days</button>
+        <button data-days="30">30 days</button>
+      </div>
+      <div class="spacer"></div>
+      <span class="form-status" id="report-status" style="margin:0;"></span>
+    </div>
+  </section>
+
+  <section class="card" id="report-results" style="display:none;">
+    <div class="stat-grid" id="report-stats"></div>
+    <div class="tir-bar" id="tir-bar"></div>
+    <div class="graph-wrap" style="padding: 0 22px 22px;">
+      <svg id="daily-graph" viewBox="0 0 600 200" preserveAspectRatio="none" style="width:100%; height:200px; display:block;"></svg>
+    </div>
+  </section>
+
+  <section class="card" id="report-table-card" style="display:none;">
+    <div class="section-title">Daily breakdown</div>
+    <div class="data-table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Date</th><th>Avg</th><th>Min</th><th>Max</th><th>In range</th><th>Readings</th><th>Carbs</th><th>Insulin</th></tr></thead>
+        <tbody id="daily-body"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<div class="modal-backdrop" id="auth-backdrop">
+  <div class="modal">
+    <h3>Authenticate</h3>
+    <p class="muted">Enter your API secret or an access token. It's hashed in your browser before being sent — never stored or transmitted in plain text.</p>
+    <div class="field">
+      <label for="auth-input">API secret or token</label>
+      <input id="auth-input" type="password" autocomplete="off" />
+    </div>
+    <div class="form-status" id="auth-status"></div>
+    <div class="modal-actions">
+      <button class="ghost" data-close="auth-backdrop">Cancel</button>
+      <button class="primary" id="auth-submit">Authenticate</button>
+    </div>
+  </div>
+</div>
+
+<p class="footer-note">Nightflare · <a href="/">Dashboard</a> · <a href="/profile">Profile</a> · <a href="/food">Food</a> · <a href="/admin">Admin</a></p>
+
+<script src="/new-ui/common.js"></script>
+<script src="/new-ui/report.js"></script>
+</body>
+</html>

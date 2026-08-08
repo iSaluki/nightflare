@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import type { Env } from "./types";
 import { entriesRoute } from "./routes/entries";
@@ -36,19 +36,40 @@ app.route("/api/v2/authorization", authorization2Route);
 app.route("/pebble", pebbleRoute);
 app.route("/rt", realtimeRoute);
 
-// The dashboard at "/" is the only page NEW_UI swaps — /admin, /food,
-// /profile, and /report always stay on the vendored Nightscout client.
+// NEW_UI swaps the dashboard, admin, food, profile, and report pages for
+// their modern (public/new-ui/*) equivalents; each still falls back to the
+// vendored Nightscout client page of the same name when NEW_UI is "false".
 // Fetched by their already-canonical (extensionless) path: Cloudflare's
 // asset binding 307-redirects any literal "*.html" filename — including
 // index.html — to its canonical URL even for internal ASSETS.fetch() calls,
 // so fetching the canonical path directly is what actually returns content.
-app.get("/", async (c) => {
-  const url = new URL(c.req.url);
-  url.pathname = c.env.NEW_UI === "true" ? "/new-ui/dashboard" : "/dashboard-classic";
-  return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
-});
+function serveUiPage(newUiName: string, vendoredName: string) {
+  return async (c: Context<{ Bindings: Env }>) => {
+    const url = new URL(c.req.url);
+    url.pathname = c.env.NEW_UI === "true" ? `/new-ui/${newUiName}` : `/${vendoredName}`;
+    return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
+  };
+}
+
+app.get("/", serveUiPage("dashboard", "dashboard-classic"));
+app.get("/admin", serveUiPage("admin", "admin"));
+app.get("/food", serveUiPage("food", "food"));
+app.get("/profile", serveUiPage("profile", "profile"));
+app.get("/report", serveUiPage("report", "report"));
 
 app.notFound((c) => c.json({ status: 404, message: "Not found" }, 404));
+
+// Without this, an uncaught exception anywhere in a route handler (e.g. a
+// D1 error) falls through to the Workers runtime's default plain-text
+// "Internal Server Error" response. Every client here — including the
+// vendored Nightscout UI and import.html — assumes JSON and calls
+// res.json() unconditionally, so that plain-text body surfaces as a
+// confusing "Unexpected token 'I' ... is not valid JSON" instead of the
+// real error.
+app.onError((err, c) => {
+  console.error(err);
+  return c.json({ status: 500, message: err instanceof Error ? err.message : "Internal server error" }, 500);
+});
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {

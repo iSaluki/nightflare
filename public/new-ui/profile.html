@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nightflare — Profile</title>
+<link rel="icon" type="image/png" href="/images/favicon-32x32.png" sizes="32x32">
+<link rel="stylesheet" href="/new-ui/app.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+      <circle cx="13" cy="13" r="12" stroke="var(--border-strong)" stroke-width="1"/>
+      <path class="wave-path" d="M3 14 L9 14 L11 8 L14 19 L16 11 L18 14 L23 14"
+        stroke="var(--zone-in)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </svg>
+    <span id="site-title">Nightflare</span>
+  </div>
+  <nav class="nav-links">
+    <a href="/">Dashboard</a>
+    <a href="/report">Report</a>
+    <a href="/profile" class="active">Profile</a>
+    <a href="/food">Food</a>
+    <a href="/admin">Admin</a>
+  </nav>
+  <div class="spacer"></div>
+  <button class="icon-btn" id="auth-btn" aria-label="Authenticate">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+  </button>
+</header>
+
+<main>
+  <div class="page-header">
+    <div>
+      <h1>Profile</h1>
+      <p>Basal rates, carb ratios, insulin sensitivity, and target range. Times are local, one schedule per day.</p>
+    </div>
+    <button class="small" id="save-profile-btn">Save profile</button>
+  </div>
+
+  <p class="notice" id="profile-notice" style="display:none;"></p>
+
+  <section class="card">
+    <div class="section-title">Basics</div>
+    <div class="field-group">
+      <div class="field-grid">
+        <div class="field">
+          <label for="p-name">Profile name</label>
+          <input id="p-name" value="Default" />
+        </div>
+        <div class="field">
+          <label for="p-units">Units</label>
+          <select id="p-units">
+            <option value="mg/dl">mg/dl</option>
+            <option value="mmol">mmol/L</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="p-dia">DIA (hours)</label>
+          <input id="p-dia" type="number" step="0.1" min="1" value="3" />
+        </div>
+        <div class="field">
+          <label for="p-timezone">Timezone</label>
+          <input id="p-timezone" placeholder="e.g. America/New_York" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="section-title">Basal rate <span class="section-sub" style="padding:0;">(U/hr)</span></div>
+    <div class="field-group">
+      <div class="schedule-editor" id="basal-editor"></div>
+      <button type="button" class="schedule-add" data-add="basal">+ Add time</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="section-title">Carb ratio <span class="section-sub" style="padding:0;">(g per unit)</span></div>
+    <div class="field-group">
+      <div class="schedule-editor" id="carbratio-editor"></div>
+      <button type="button" class="schedule-add" data-add="carbratio">+ Add time</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="section-title">Insulin sensitivity <span class="section-sub" style="padding:0;">(mg/dl per unit)</span></div>
+    <div class="field-group">
+      <div class="schedule-editor" id="sens-editor"></div>
+      <button type="button" class="schedule-add" data-add="sens">+ Add time</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="section-title">Target range</div>
+    <div class="field-group">
+      <div class="schedule-editor" id="target-editor"></div>
+      <button type="button" class="schedule-add" data-add="target">+ Add time</button>
+    </div>
+  </section>
+</main>
+
+<div class="modal-backdrop" id="auth-backdrop">
+  <div class="modal">
+    <h3>Authenticate</h3>
+    <p class="muted">Enter your API secret or an access token. It's hashed in your browser before being sent — never stored or transmitted in plain text.</p>
+    <div class="field">
+      <label for="auth-input">API secret or token</label>
+      <input id="auth-input" type="password" autocomplete="off" />
+    </div>
+    <div class="form-status" id="auth-status"></div>
+    <div class="modal-actions">
+      <button class="ghost" data-close="auth-backdrop">Cancel</button>
+      <button class="primary" id="auth-submit">Authenticate</button>
+    </div>
+  </div>
+</div>
+
+<p class="footer-note">Nightflare · <a href="/">Dashboard</a> · <a href="/report">Reports</a> · <a href="/food">Food</a> · <a href="/admin">Admin</a></p>
+
+<script src="/new-ui/common.js"></script>
+<script src="/new-ui/profile.js"></script>
+</body>
+</html>
