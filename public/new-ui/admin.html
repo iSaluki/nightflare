@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nightflare — Admin</title>
+<link rel="icon" type="image/png" href="/images/favicon-32x32.png" sizes="32x32">
+<link rel="stylesheet" href="/new-ui/app.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+      <circle cx="13" cy="13" r="12" stroke="var(--border-strong)" stroke-width="1"/>
+      <path class="wave-path" d="M3 14 L9 14 L11 8 L14 19 L16 11 L18 14 L23 14"
+        stroke="var(--zone-in)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </svg>
+    <span id="site-title">Nightflare</span>
+  </div>
+  <nav class="nav-links">
+    <a href="/">Dashboard</a>
+    <a href="/report">Report</a>
+    <a href="/profile">Profile</a>
+    <a href="/food">Food</a>
+    <a href="/admin" class="active">Admin</a>
+  </nav>
+  <div class="spacer"></div>
+  <button class="icon-btn" id="auth-btn" aria-label="Authenticate">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+  </button>
+</header>
+
+<main>
+  <div class="page-header">
+    <div>
+      <h1>Admin tools</h1>
+      <p>Manage API clients (subjects), roles, and bulk data import. Requires the master API secret.</p>
+    </div>
+  </div>
+
+  <div id="admin-gate" class="card" style="display:none;">
+    <p class="notice" id="admin-gate-notice">Sign in with the admin API secret to manage subjects and roles.</p>
+  </div>
+
+  <div id="admin-content">
+    <section class="card">
+      <div class="page-header" style="padding: 22px 22px 0;">
+        <div>
+          <h2 style="margin:0; font-size:1.02rem;">Subjects</h2>
+          <p class="section-sub" style="padding:2px 0 0;">API clients: uploaders, followers, watch apps. Each gets a derived access token.</p>
+        </div>
+        <button class="small" id="add-subject-btn">+ Add subject</button>
+      </div>
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Name</th><th>Roles</th><th>Notes</th><th>Access token</th><th></th></tr></thead>
+          <tbody id="subjects-body"><tr><td colspan="5" class="empty-state">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="page-header" style="padding: 22px 22px 0;">
+        <div>
+          <h2 style="margin:0; font-size:1.02rem;">Roles</h2>
+          <p class="section-sub" style="padding:2px 0 0;">Permission bundles assigned to subjects, e.g. <code>api:*:read</code>, <code>api:treatments:create</code>.</p>
+        </div>
+        <button class="small" id="add-role-btn">+ Add role</button>
+      </div>
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Name</th><th>Permissions</th><th>Notes</th><th></th></tr></thead>
+          <tbody id="roles-body"><tr><td colspan="4" class="empty-state">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="page-header" style="padding: 22px;">
+        <div>
+          <h2 style="margin:0; font-size:1.02rem;">Import from another Nightscout instance</h2>
+          <p class="section-sub" style="padding:2px 0 0;">Pull entries, treatments, devicestatus, profile, food, and activity from an existing site.</p>
+        </div>
+        <a class="small" style="text-decoration:none;" href="/import">Open importer &rarr;</a>
+      </div>
+    </section>
+  </div>
+</main>
+
+<div class="modal-backdrop" id="auth-backdrop">
+  <div class="modal">
+    <h3>Authenticate</h3>
+    <p class="muted">Enter your API secret or an access token. It's hashed in your browser before being sent — never stored or transmitted in plain text.</p>
+    <div class="field">
+      <label for="auth-input">API secret or token</label>
+      <input id="auth-input" type="password" autocomplete="off" />
+    </div>
+    <div class="form-status" id="auth-status"></div>
+    <div class="modal-actions">
+      <button class="ghost" data-close="auth-backdrop">Cancel</button>
+      <button class="primary" id="auth-submit">Authenticate</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="subject-backdrop">
+  <div class="modal wide">
+    <h3 id="subject-modal-title">Add subject</h3>
+    <form id="subject-form">
+      <input type="hidden" id="subject-id" />
+      <div class="field">
+        <label for="subject-name">Name</label>
+        <input id="subject-name" required />
+      </div>
+      <div class="field">
+        <label for="subject-roles">Roles (comma-separated role names)</label>
+        <input id="subject-roles" placeholder="readable, careportal" />
+      </div>
+      <div class="field">
+        <label for="subject-notes">Notes</label>
+        <input id="subject-notes" />
+      </div>
+      <div class="form-status" id="subject-status"></div>
+      <div class="modal-actions">
+        <button type="button" class="ghost" data-close="subject-backdrop">Cancel</button>
+        <button type="submit" class="primary">Save subject</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="role-backdrop">
+  <div class="modal wide">
+    <h3 id="role-modal-title">Add role</h3>
+    <form id="role-form">
+      <input type="hidden" id="role-id" />
+      <div class="field">
+        <label for="role-name">Name</label>
+        <input id="role-name" required />
+      </div>
+      <div class="field">
+        <label for="role-permissions">Permissions (comma-separated, e.g. <code>api:treatments:create</code>, <code>*:*:read</code>)</label>
+        <input id="role-permissions" placeholder="api:*:read" />
+      </div>
+      <div class="field">
+        <label for="role-notes">Notes</label>
+        <input id="role-notes" />
+      </div>
+      <div class="form-status" id="role-status"></div>
+      <div class="modal-actions">
+        <button type="button" class="ghost" data-close="role-backdrop">Cancel</button>
+        <button type="submit" class="primary">Save role</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<p class="footer-note">Nightflare · <a href="/">Dashboard</a> · <a href="/report">Reports</a> · <a href="/profile">Profile</a> · <a href="/food">Food</a></p>
+
+<script src="/new-ui/common.js"></script>
+<script src="/new-ui/admin.js"></script>
+</body>
+</html>
