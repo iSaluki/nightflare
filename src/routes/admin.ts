@@ -12,7 +12,7 @@ adminRoute.use("*", async (c, next) => {
   await next();
 });
 
-const IMPORTABLE_COLLECTIONS = ["entries", "treatments", "devicestatus", "profile", "food", "activity"];
+const IMPORTABLE_COLLECTIONS = ["entries", "treatments", "devicestatus", "profile", "food", "activity", "subjects"];
 
 // --- Import from another Nightscout instance -------------------------------
 
