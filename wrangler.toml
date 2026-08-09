@@ -3,6 +3,20 @@ main = "src/index.ts"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Optional: serve this site from your own domain instead of the default
+# <name>.<subdomain>.workers.dev URL. The Deploy to Cloudflare button can't
+# prompt for this inline (it only provisions whatever's declared here), so
+# it's a two-step process instead: after deploying, uncomment this block,
+# set `pattern` to your domain (it must already be added as a zone on this
+# same Cloudflare account — Websites -> Add a domain in the dashboard if
+# it isn't yet), then redeploy (`npm run deploy`, or push to your fork if
+# using the button's auto-deploy-on-push). Equivalently, skip this file
+# entirely and add the domain via the dashboard instead: your Worker's page
+# -> Settings -> Domains & Routes -> Add -> Custom Domain.
+# [[routes]]
+# pattern = "nightscout.example.com"
+# custom_domain = true
+
 # Web UI: the vendored (unmodified) Nightscout client bundle + pre-rendered
 # page shells (index/admin/food/profile/report), served as plain static
 # multi-page assets — not an SPA.
