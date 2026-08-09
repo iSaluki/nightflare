@@ -40,11 +40,24 @@ const locals = { bundle: '/bundle', cachebuster: 'nightflare' };
 // wrong — the only trace is the browser console, which isn't reachable on
 // e.g. mobile. Installed before any other script tag so it also catches
 // errors thrown while bundle.app.js/client.js are first evaluated.
+//
+// Only fires up until the app's own successful boot hides the loading
+// panel -- checked directly (not cached) each time, since that's the
+// client's own signal that it made it past initialization. Afterwards,
+// plenty of harmless runtime errors can happen (e.g. audio.play() being
+// blocked by the browser's autoplay policy until the user interacts with
+// the page, which the vendored alarm code doesn't catch) and none of
+// those should hijack a working dashboard back into looking stuck/broken.
 const errorOverlayScript = `
 <script>
 (function () {
+  // Looked up fresh on every call, not cached at the top: this script runs
+  // as the first thing in <body>, before #centerMessagePanel -- which comes
+  // later in the HTML -- has been parsed into the DOM yet, so caching it
+  // once here would permanently capture null.
   function show(text) {
     var panel = document.getElementById('centerMessagePanel');
+    if (panel && panel.style.display === 'none') { return; }
     var el = document.getElementById('loadingMessageText');
     if (panel) { panel.style.display = ''; }
     if (el) { el.textContent = 'Error: ' + text; }
