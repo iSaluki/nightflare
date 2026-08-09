@@ -42,8 +42,12 @@ export class Collection {
     const extraKeys = Object.keys(extra);
     const columns = ["id", "date", "data", ...extraKeys];
     const placeholders = columns.map(() => "?").join(",");
+    // OR IGNORE: uploaders (and import jobs resumed after an interruption)
+    // routinely retry a POST for a document whose _id already made it in on
+    // a prior attempt -- that should be a harmless no-op, not a UNIQUE
+    // constraint error surfaced back as a 500.
     await this.db
-      .prepare(`INSERT INTO ${this.opts.table} (${columns.join(",")}) VALUES (${placeholders})`)
+      .prepare(`INSERT OR IGNORE INTO ${this.opts.table} (${columns.join(",")}) VALUES (${placeholders})`)
       .bind(id, date, JSON.stringify(record), ...extraKeys.map((k) => extra[k]))
       .run();
     return record;

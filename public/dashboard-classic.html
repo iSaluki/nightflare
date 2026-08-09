@@ -215,8 +215,13 @@
 <body>
 <script>
 (function () {
+  // Looked up fresh on every call, not cached at the top: this script runs
+  // as the first thing in <body>, before #centerMessagePanel -- which comes
+  // later in the HTML -- has been parsed into the DOM yet, so caching it
+  // once here would permanently capture null.
   function show(text) {
     var panel = document.getElementById('centerMessagePanel');
+    if (panel && panel.style.display === 'none') { return; }
     var el = document.getElementById('loadingMessageText');
     if (panel) { panel.style.display = ''; }
     if (el) { el.textContent = 'Error: ' + text; }
