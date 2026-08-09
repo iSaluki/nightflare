@@ -73,6 +73,41 @@ const errorOverlayScript = `
 </script>
 `;
 
+// Trims whitespace from the device-authentication dialog's secret/token
+// field before it's hashed and sent. Mobile keyboards' autocomplete/autofill
+// routinely leave a trailing space in a password-type input, which silently
+// turns a correct credential into an incorrect one -- sha1("secret ") !=
+// sha1("secret") -- surfacing as "Wrong API secret" with no indication
+// anything about the typed value itself was the problem. Patches
+// hashauth.processSecret (rather than the input's value directly) so it
+// covers every call site -- the dashboard, admin, profile, food, and report
+// pages all reuse the same vendored dialog. Installed after bundle.app.js,
+// since that's what defines window.Nightscout.client.hashauth; retries
+// briefly in case script execution order ever changes.
+const authTrimFixScript = `
+<script>
+(function () {
+  function patch() {
+    var hashauth = window.Nightscout && window.Nightscout.client && window.Nightscout.client.hashauth;
+    if (!hashauth || !hashauth.processSecret || hashauth.processSecret.__trimsInput) { return false; }
+    var original = hashauth.processSecret;
+    var wrapped = function (apisecret, storeapisecret, callback) {
+      return original.call(hashauth, typeof apisecret === 'string' ? apisecret.trim() : apisecret, storeapisecret, callback);
+    };
+    wrapped.__trimsInput = true;
+    hashauth.processSecret = wrapped;
+    return true;
+  }
+  if (!patch()) {
+    var tries = 0;
+    var iv = setInterval(function () {
+      if (patch() || ++tries > 100) { clearInterval(iv); }
+    }, 20);
+  }
+})();
+</script>
+`;
+
 for (const page of pages) {
   let html = ejs.render(fs.readFileSync(path.join(viewsDir, page.file), 'utf8'), {
     locals,
@@ -120,6 +155,8 @@ for (const page of pages) {
       '<div style="padding:10px 20px"><a href="/import" style="color:#8ab4f8">&#8594; Import from another Nightscout instance</a></div>\n    <div id="admin_placeholder"></div>'
     );
   }
+
+  html = html.replace('</body>', authTrimFixScript + '</body>');
 
   const outPath = path.join(outDir, page.out);
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
