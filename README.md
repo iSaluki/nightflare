@@ -193,6 +193,23 @@ Nightscout, so existing app configs work unmodified once pointed at your new URL
 npm run deploy
 ```
 
+### 6. (Optional) Use your own domain instead of *.workers.dev
+
+Whether you deployed via the button or the CLI, your site is reachable at
+`<name>.<your-subdomain>.workers.dev` by default. To use your own domain
+instead: add the domain to this Cloudflare account as a zone if it isn't
+already there (dashboard -> Websites -> Add a domain), then either
+
+- uncomment and fill in the `[[routes]]` block in `wrangler.toml`, then
+  redeploy (`npm run deploy`, or push to your fork if you're relying on the
+  button's auto-deploy-on-push), or
+- skip `wrangler.toml` entirely and add it via the dashboard instead: your
+  Worker's page -> Settings -> Domains & Routes -> Add -> Custom Domain.
+
+The Deploy to Cloudflare button itself can't prompt for a domain inline — it
+only provisions whatever `wrangler.toml` already declares — so this is
+always a short follow-up step rather than something the button does for you.
+
 ### Local development
 
 ```bash
