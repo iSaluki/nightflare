@@ -33,12 +33,17 @@
 </header>
 <main>
   <div class="card">
-    <p>Pulls entries, treatments, devicestatus, profile, food, and activity from an existing
-      Nightscout site's REST API into this deployment. Runs in the background in paginated
-      batches (a Durable Object alarm loop), so it's safe for years of history. Authenticate the
-      pull with either the source's <code>API_SECRET</code> (hashed before sending, never stored)
-      or a read-only subject/access token — a token is the safer choice since it only needs read
-      access, unlike the source's master secret.</p>
+    <p>Pulls entries, treatments, devicestatus, profile, food, activity, and subjects/roles (API
+      tokens) from an existing Nightscout site's REST API into this deployment. Runs in the
+      background in paginated batches (a Durable Object alarm loop), so it's safe for years of
+      history. Authenticate the pull with either the source's <code>API_SECRET</code> (hashed
+      before sending, never stored) or a subject/access token — a token is the safer choice since
+      it doesn't expose the source's master secret, but importing <b>subjects</b> specifically
+      needs one with admin rights on the source (subjects/roles are an admin-only endpoint there
+      too). Imported subjects get a brand-new access token on this deployment — the source's
+      token values themselves can't carry over, since each token is derived from its own
+      deployment's secret — so any existing shared follower links will need to be regenerated
+      from this site's Admin Tools afterwards.</p>
     <form id="import-form">
       <label>Source URL <input name="sourceUrl" type="url" placeholder="https://my-old-site.herokuapp.com" required /></label>
       <label>Source API_SECRET <input name="apiSecret" type="password" placeholder="leave blank if using a token instead" /></label>
@@ -58,7 +63,7 @@
   </div>
 </main>
 <script>
-  const COLLECTIONS = ["entries", "treatments", "devicestatus", "profile", "food", "activity"];
+  const COLLECTIONS = ["entries", "treatments", "devicestatus", "profile", "food", "activity", "subjects"];
   document.getElementById("collections").innerHTML = COLLECTIONS.map(
     (c) => `<label><input type="checkbox" name="collections" value="${c}" checked /> ${c}</label>`
   ).join("");
