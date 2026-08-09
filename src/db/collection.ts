@@ -76,16 +76,24 @@ export class Collection {
     return row ? JSON.parse(row.data) : null;
   }
 
+  // A true upsert: falls back to inserting a new row when `id` doesn't
+  // match an existing one. The vendored careportal/profile/food editors all
+  // PUT unconditionally, including for a document that's never been saved
+  // before -- e.g. a site's very first profile, which has no _id yet -- so
+  // treating PUT as "update-only" 400s on exactly that case.
   async update(id: string, doc: DocBase): Promise<DocBase> {
     const record = { ...doc, _id: id };
     const date = this.opts.deriveDate(record);
     const extra = this.opts.extraColumns?.(record) ?? {};
     const extraKeys = Object.keys(extra);
     const setClause = ["date = ?", "data = ?", ...extraKeys.map((k) => `${k} = ?`)].join(", ");
-    await this.db
+    const result = await this.db
       .prepare(`UPDATE ${this.opts.table} SET ${setClause} WHERE id = ?`)
       .bind(date, JSON.stringify(record), ...extraKeys.map((k) => extra[k]), id)
       .run();
+    if (result.meta.changes === 0) {
+      return this.insert(record);
+    }
     return record;
   }
 

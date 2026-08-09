@@ -104,9 +104,13 @@ export function collectionRoute(opts: Options): Hono<{ Bindings: Env }> {
     if (!can(auth, perm("update"))) return c.json({ status: 401, message: "Unauthorized" }, 401);
     const col = opts.getCollection(c.env.DB);
     const body = (await parseRequestBody(c)) as DocBase;
-    if (!body._id) return c.json({ status: 400, message: "_id is required for update" }, 400);
-    const result = await col.update(body._id, body);
-    await notifyChange(c.env, opts.name, "update", result);
+    // The vendored careportal/profile/food editors PUT here unconditionally,
+    // including for a document that's never been saved before (no _id yet)
+    // -- e.g. a site's very first profile. Treat a missing _id as a create
+    // rather than rejecting it; col.update() itself falls back to an insert
+    // too, for the case where an _id is given but doesn't exist yet.
+    const result = body._id ? await col.update(body._id, body) : await col.insert(body);
+    await notifyChange(c.env, opts.name, body._id ? "update" : "create", result);
     return c.json(result);
   });
 
