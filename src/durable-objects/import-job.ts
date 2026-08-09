@@ -95,7 +95,8 @@ export class ImportJob extends DurableObject<Env> {
 
       const res = await fetch(url.toString(), { headers });
       if (!res.ok) {
-        throw new Error(`source returned ${res.status} for ${collectionName}`);
+        const bodySnippet = (await res.text().catch(() => "")).slice(0, 200);
+        throw new Error(`source returned ${res.status} for ${collectionName}${bodySnippet ? `: ${bodySnippet}` : ""}`);
       }
       const batch = (await res.json()) as DocBase[];
 
