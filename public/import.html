@@ -35,12 +35,14 @@
   <div class="card">
     <p>Pulls entries, treatments, devicestatus, profile, food, and activity from an existing
       Nightscout site's REST API into this deployment. Runs in the background in paginated
-      batches (a Durable Object alarm loop), so it's safe for years of history. The source's
-      <code>API_SECRET</code> is only used to authenticate the pull — hashed before sending,
-      never stored.</p>
+      batches (a Durable Object alarm loop), so it's safe for years of history. Authenticate the
+      pull with either the source's <code>API_SECRET</code> (hashed before sending, never stored)
+      or a read-only subject/access token — a token is the safer choice since it only needs read
+      access, unlike the source's master secret.</p>
     <form id="import-form">
       <label>Source URL <input name="sourceUrl" type="url" placeholder="https://my-old-site.herokuapp.com" required /></label>
-      <label>Source API_SECRET <input name="apiSecret" type="password" placeholder="leave blank if the source has none" /></label>
+      <label>Source API_SECRET <input name="apiSecret" type="password" placeholder="leave blank if using a token instead" /></label>
+      <label>Source access token <input name="sourceToken" type="password" placeholder="leave blank if using API_SECRET instead" /></label>
       <label>Your admin API_SECRET (to authorize this import) <input name="adminSecret" type="password" required /></label>
       <div class="row" id="collections"></div>
       <button type="submit">Start import</button>
@@ -90,6 +92,7 @@
     const payload = {
       sourceUrl: form.get("sourceUrl"),
       apiSecret: form.get("apiSecret") || undefined,
+      sourceToken: form.get("sourceToken") || undefined,
       collections: form.getAll("collections"),
     };
     const status = document.getElementById("status");
