@@ -14,6 +14,25 @@ up-to-date schema), and deploys. You'll still need to set `API_SECRET` yourself 
 [Set your API secret](#4-set-your-api-secret) below — the button can't safely generate and hand
 you back a real secret.
 
+## Preamble
+
+I decided to create this project as I wanted to be able to deploy Nightscout onto the Cloudflare Serverless platform. It is designed to be usable within free tier limits, but I cannot guarantee that you won't hit any limits at all.
+
+Nightflare uses code from Nightscout but works rather differently under the hood, meaning this isn't a straight fork of Nightscout. There isn't perfect feature parity, although I have done my best to include the main functionality. 
+
+In addition to the Nightscout feature set, this project also implements:
+
+- Deployment to Cloudflare target, and a button to quickly create your own deployment
+- A Nightscout importer, capable of importing data from an existing Nightscout instance (there is a link in the admin panel)
+- A `NEW_UI` environment variable that defaults to `false` but can be toggled to `true` to enable a WIP new interface for Nightflare.
+
+Before deploying this, you should understand:
+
+- This project was largely architected and written by Claude, so mileage may vary and, as standard, **I cannot provide any warranty for the functionality or integrity of your data if you deploy this**.
+- This was designed for my own use case and may not work perfectly with yours.
+- You are free to open issues or pull requests if you would like any changes. I will review these on a best effort basis. Forks of this repository are welcome and encouraged if you think you can make something even better.
+- The backend code has been changed drastically. Whilst it looks a lot like Nightscout and does contain a lot of Nightscout code, we are using a different type of database engine and are avoiding any persistent processes in the background. This massive set of changes combined with so far limited real world testing means that there may be some unintended issues still - although I do hope to even them out over time. 
+
 ## What this actually is
 
 Nightscout's *server* (Node/Express + MongoDB, socket.io, cron jobs) can't run in Workers —
