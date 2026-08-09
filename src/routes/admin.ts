@@ -17,7 +17,7 @@ const IMPORTABLE_COLLECTIONS = ["entries", "treatments", "devicestatus", "profil
 // --- Import from another Nightscout instance -------------------------------
 
 adminRoute.post("/import", async (c) => {
-  const body = await c.req.json<{ sourceUrl?: string; apiSecret?: string; collections?: string[] }>();
+  const body = await c.req.json<{ sourceUrl?: string; apiSecret?: string; sourceToken?: string; collections?: string[] }>();
   if (!body.sourceUrl) return c.json({ status: 400, message: "sourceUrl is required" }, 400);
 
   let sourceUrl: string;
@@ -40,8 +40,9 @@ adminRoute.post("/import", async (c) => {
     .run();
 
   const apiSecretHash = body.apiSecret ? await sha1Hex(body.apiSecret) : null;
+  const sourceToken = body.sourceToken || null;
   const stub = c.env.IMPORT_JOB.get(c.env.IMPORT_JOB.idFromName(jobId));
-  await stub.start({ jobId, sourceUrl, apiSecretHash, collections });
+  await stub.start({ jobId, sourceUrl, apiSecretHash, sourceToken, collections });
 
   return c.json({ jobId, status: "running", sourceUrl, collections }, 202);
 });

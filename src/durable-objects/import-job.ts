@@ -21,6 +21,7 @@ interface ImportState {
   jobId: string;
   sourceUrl: string;
   apiSecretHash: string | null;
+  sourceToken: string | null;
   collections: string[];
   collectionIndex: number;
   cursor: number | null;
@@ -28,11 +29,18 @@ interface ImportState {
 }
 
 export class ImportJob extends DurableObject<Env> {
-  async start(params: { jobId: string; sourceUrl: string; apiSecretHash: string | null; collections: string[] }): Promise<void> {
+  async start(params: {
+    jobId: string;
+    sourceUrl: string;
+    apiSecretHash: string | null;
+    sourceToken: string | null;
+    collections: string[];
+  }): Promise<void> {
     const state: ImportState = {
       jobId: params.jobId,
       sourceUrl: params.sourceUrl.replace(/\/$/, ""),
       apiSecretHash: params.apiSecretHash,
+      sourceToken: params.sourceToken,
       collections: params.collections,
       collectionIndex: 0,
       cursor: null,
@@ -77,6 +85,10 @@ export class ImportJob extends DurableObject<Env> {
       if (!singlePage && state.cursor !== null) {
         url.searchParams.set("find[date][$lt]", String(state.cursor));
       }
+      // A subject/access token (Nightscout's `?token=` follower-auth scheme)
+      // is a more appropriate credential to hand an import job than the
+      // source site's master secret, so support it alongside apiSecretHash.
+      if (state.sourceToken) url.searchParams.set("token", state.sourceToken);
 
       const headers: Record<string, string> = {};
       if (state.apiSecretHash) headers["api-secret"] = state.apiSecretHash;
