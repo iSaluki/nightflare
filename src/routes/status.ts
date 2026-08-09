@@ -85,7 +85,15 @@ verifyAuthRoute.get("/", async (c) => {
       canWrite: canWrite(auth),
       isAdmin: isAdminPerm,
       message: authorized ? "OK" : "UNAUTHORIZED",
-      rolefound: auth.authenticated ? "FOUND" : "NOTFOUND",
+      // The vendored client treats these as distinct auth *methods*, not
+      // just "authenticated or not": rolefound: 'FOUND' means "a per-subject
+      // token matched a role", which (combined with "remember this device")
+      // triggers a page reload right after login that master-secret logins
+      // were never meant to go through — reporting it for master-secret auth
+      // too made every "remember this device" master-secret login reload
+      // unexpectedly, sometimes visibly looping if that reload didn't
+      // cleanly restore the session.
+      rolefound: auth.authenticated && !auth.isMasterSecret ? "FOUND" : "NOTFOUND",
       permissions: auth.usedDefaults ? "DEFAULT" : "ROLE",
     },
   });
