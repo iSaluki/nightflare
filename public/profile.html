@@ -320,5 +320,27 @@
         <script src="/bundle/js/bundle.app.js"></script>
     <script src="/io-shim.js"></script>
     <script src="/js/profileinit.js"></script>
-  </body>
+  
+<script>
+(function () {
+  function patch() {
+    var hashauth = window.Nightscout && window.Nightscout.client && window.Nightscout.client.hashauth;
+    if (!hashauth || !hashauth.processSecret || hashauth.processSecret.__trimsInput) { return false; }
+    var original = hashauth.processSecret;
+    var wrapped = function (apisecret, storeapisecret, callback) {
+      return original.call(hashauth, typeof apisecret === 'string' ? apisecret.trim() : apisecret, storeapisecret, callback);
+    };
+    wrapped.__trimsInput = true;
+    hashauth.processSecret = wrapped;
+    return true;
+  }
+  if (!patch()) {
+    var tries = 0;
+    var iv = setInterval(function () {
+      if (patch() || ++tries > 100) { clearInterval(iv); }
+    }, 20);
+  }
+})();
+</script>
+</body>
 </html>
