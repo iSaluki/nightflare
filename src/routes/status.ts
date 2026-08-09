@@ -6,6 +6,17 @@ export const statusRoute = new Hono<{ Bindings: Env }>();
 
 const VERSION = "0.1.0";
 
+// The vendored client does exact-string comparisons (`settings.units ===
+// 'mmol'`) everywhere it decides how to scale/format a BG value — it never
+// just checks "does this look like mmol". Stock Nightscout's server always
+// normalized DISPLAY_UNITS this same way (lib/server/env.js), so an operator
+// free-typing "mmol/L" (as the wrangler.toml comment for this var literally
+// suggests) still gets correctly recognized rather than silently falling
+// back to mg/dl display.
+function normalizeUnits(raw: string | undefined): string {
+  return raw && raw.toLowerCase().includes("mmol") ? "mmol" : "mg/dl";
+}
+
 statusRoute.get("/", async (c) => {
   const auth = await authenticate(c);
   const now = new Date();
@@ -29,7 +40,7 @@ statusRoute.get("/", async (c) => {
     careportalEnabled: apiEnabled && enable.indexOf("careportal") > -1,
     boluscalcEnabled: apiEnabled && enable.indexOf("boluscalc") > -1,
     settings: {
-      units: c.env.DISPLAY_UNITS || "mg/dl",
+      units: normalizeUnits(c.env.DISPLAY_UNITS),
       timeFormat: 12,
       nightMode: false,
       editMode: true,
