@@ -12,6 +12,13 @@ export interface AuthResult {
   subjectName: string;
   permissions: string[];
   usedDefaults: boolean;
+  /** True when `authenticated` came from the master API_SECRET, as opposed
+   * to a per-subject access token/JWT. The vendored client's hashauth.js
+   * treats these as meaningfully different: it only sets its own
+   * `tokenauthenticated` flag (which, combined with "remember this
+   * device", triggers a page reload right after login) for subject-token
+   * auth — verifyauth's `rolefound` is how it tells the two apart. */
+  isMasterSecret: boolean;
 }
 
 const DEFAULT_ROLE_NAME = "readable";
@@ -112,13 +119,13 @@ async function resolveToken(env: Env, presented: string): Promise<{ row: Subject
 
 async function buildResult(
   env: Env,
-  opts: { authenticated: boolean; isAdmin: boolean; subjectName: string; permissions: string[] }
+  opts: { authenticated: boolean; isAdmin: boolean; subjectName: string; permissions: string[]; isMasterSecret?: boolean }
 ): Promise<AuthResult> {
   if (opts.authenticated) {
-    return { ...opts, usedDefaults: false };
+    return { ...opts, isMasterSecret: opts.isMasterSecret ?? false, usedDefaults: false };
   }
   const defaults = await defaultPermissions(env.DB);
-  return { authenticated: false, isAdmin: false, subjectName: "anonymous", permissions: defaults, usedDefaults: true };
+  return { authenticated: false, isAdmin: false, subjectName: "anonymous", permissions: defaults, isMasterSecret: false, usedDefaults: true };
 }
 
 /** Resolves the caller's identity/permissions from (in priority order):
@@ -136,7 +143,7 @@ export async function authenticate(c: Context<{ Bindings: Env }>): Promise<AuthR
   if (c.env.API_SECRET && headerSecret) {
     const expected = await sha1Hex(c.env.API_SECRET);
     if (timingSafeEqual(headerSecret.toLowerCase(), expected)) {
-      return buildResult(c.env, { authenticated: true, isAdmin: true, subjectName: "admin", permissions: ["*"] });
+      return buildResult(c.env, { authenticated: true, isAdmin: true, subjectName: "admin", permissions: ["*"], isMasterSecret: true });
     }
   }
 
@@ -178,7 +185,7 @@ export async function resolveCredentials(
   if (env.API_SECRET && creds.secretHash) {
     const expected = await sha1Hex(env.API_SECRET);
     if (timingSafeEqual(creds.secretHash.toLowerCase(), expected)) {
-      return buildResult(env, { authenticated: true, isAdmin: true, subjectName: "admin", permissions: ["*"] });
+      return buildResult(env, { authenticated: true, isAdmin: true, subjectName: "admin", permissions: ["*"], isMasterSecret: true });
     }
   }
 
