@@ -13,4 +13,5 @@ export interface Env {
   ENABLE: string;
   DISPLAY_UNITS: string;
   NEW_UI: string;
+  AUTH_DEFAULT_ROLES: string;
 }

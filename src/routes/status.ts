@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Env } from "../types";
-import { authenticate, canRead, canWrite, canAny } from "../lib/auth";
+import { authenticate, canRead, canWrite, canAny, defaultRoleNames } from "../lib/auth";
 
 export const statusRoute = new Hono<{ Bindings: Env }>();
 
@@ -50,7 +50,7 @@ statusRoute.get("/", async (c) => {
       language: "en",
       showPlugins: enable,
       enable,
-      authDefaultRoles: "readable",
+      authDefaultRoles: defaultRoleNames(c.env).join(" "),
       thresholds: { bgHigh: 260, bgTargetTop: 180, bgTargetBottom: 80, bgLow: 55 },
     },
     extendedSettings: {},

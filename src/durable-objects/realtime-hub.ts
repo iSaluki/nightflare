@@ -106,9 +106,17 @@ export class RealtimeHub extends DurableObject<Env> {
       return;
     }
     if (msg.event === "loadRetro") {
-      const retro = await this.buildRetroData();
+      // Unlike the initial 'authorize' handshake's dataUpdate push and
+      // broadcastToReaders (both already gated on socketAuth.read), this
+      // had no permission check at all -- a client could request 30 days
+      // of devicestatus history over the socket without ever having
+      // authorized. Same attachment-based check handleDbWrite already uses.
+      const attachment = (ws.deserializeAttachment() as { auth?: SocketAuth } | null) ?? null;
       if (msg.ackId !== undefined) this.send(ws, { t: "ack", ackId: msg.ackId, data: { result: "success" } });
-      this.send(ws, { t: "event", ns: msg.ns, event: "retroUpdate", data: retro });
+      if (attachment?.auth?.read) {
+        const retro = await this.buildRetroData();
+        this.send(ws, { t: "event", ns: msg.ns, event: "retroUpdate", data: retro });
+      }
       return;
     }
     if (msg.event === "dbAdd" || msg.event === "dbUpdate" || msg.event === "dbUpdateUnset") {
