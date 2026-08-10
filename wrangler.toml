@@ -65,6 +65,14 @@ DISPLAY_UNITS = "mg/dl"
 # instead of the vendored Nightscout client. Only the dashboard is affected —
 # /admin, /food, /profile, and /report always stay on the vendored UI.
 NEW_UI = "false"
+# Role(s) (space- or comma-separated, matching auth_roles.name) granted to a
+# request presenting no api-secret/token at all. Defaults to "denied" (no
+# access whatsoever, including to glucose data) when this is unset — unlike
+# stock Nightscout, whose historical AUTH_DEFAULT_ROLES default is
+# "readable" (glucose data visible to anyone with the URL, no token
+# required). Set to "readable" here explicitly if you actually want that
+# stock behavior back.
+AUTH_DEFAULT_ROLES = "denied"
 
 # Secrets (set with `wrangler secret put API_SECRET`), not committed:
 #   API_SECRET - plaintext master secret; clients send sha1(API_SECRET) as the api-secret header,

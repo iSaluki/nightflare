@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Env } from "../types";
 import { entriesCollection } from "../db";
+import { authenticate, canRead } from "../lib/auth";
 
 // Legacy Pebble watchface endpoint some watch/widget apps still poll.
 export const pebbleRoute = new Hono<{ Bindings: Env }>();
@@ -19,6 +20,13 @@ const DIRECTIONS: Record<string, number> = {
 };
 
 pebbleRoute.get("/", async (c) => {
+  // Had no auth check at all -- unconditionally returned the last 10
+  // glucose readings to anyone. Pebble apps authenticate the same way
+  // followers do, via ?token= (Nightscout's watchface config field for
+  // this asks for exactly that).
+  const auth = await authenticate(c);
+  if (!canRead(auth)) return c.json({ status: 401, message: "Unauthorized" }, 401);
+
   const params = new URLSearchParams();
   params.set("find[type]", "sgv");
   params.set("count", "10");

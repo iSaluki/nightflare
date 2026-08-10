@@ -54,12 +54,36 @@ actually uses:
 - **Auth**: `api-secret: sha1(API_SECRET)` header, exactly like stock Nightscout, plus scoped
   per-client tokens with role-based permissions (`admin`/`readable`/`careportal`/custom) —
   tokens are derived deterministically from a subject's id + `API_SECRET` (never stored raw),
-  matching the "click the token to get a shareable link" UX of Nightscout's real admin UI.
+  matching the "click the token to get a shareable link" UX of Nightscout's real admin UI. By
+  default, a request presenting no credential at all gets **no access** to anything, glucose data
+  included — see [`AUTH_DEFAULT_ROLES`](#access-control-auth_default_roles) below if you actually
+  want stock Nightscout's traditional anyone-with-the-url-can-read behavior back.
 - **Import from an existing Nightscout instance**: a Nightflare-specific addition (`/import`,
   linked from `/admin`) that pulls entries/treatments/devicestatus/profile/food/activity from
   another Nightscout site's REST API, given its URL and `API_SECRET`. Runs as a Durable Object
   alarm loop in paginated batches, so it comfortably handles years of history well outside any
   single request's time budget.
+
+## Access control (`AUTH_DEFAULT_ROLES`)
+
+A request presenting no `api-secret`/`token` at all gets whatever role(s) `AUTH_DEFAULT_ROLES`
+names — space- or comma-separated, matching a role's `name` (`admin`, `readable`, `careportal`,
+`denied`, or any custom role you've created). **This defaults to `"denied"` when unset: no
+glucose data, treatments, or anything else is served to an unauthenticated request.** Every route
+checks this *before* touching the database, and the same check gates the WebSocket realtime feed
+(both the initial push and the retro-history load), so an unauthenticated client can't get data
+through either path.
+
+This is a deliberate departure from stock Nightscout, whose historical `AUTH_DEFAULT_ROLES`
+default is `"readable"` — meaning glucose data is visible to anyone who has the URL, no token
+required, which many real deployments rely on for quick access from any device without a login
+step. If you want that behavior here, set it explicitly:
+
+```toml
+# wrangler.toml
+[vars]
+AUTH_DEFAULT_ROLES = "readable"
+```
 
 ## Optional: a modern dashboard (`NEW_UI`)
 

@@ -21,7 +21,27 @@ export interface AuthResult {
   isMasterSecret: boolean;
 }
 
-const DEFAULT_ROLE_NAME = "readable";
+// Unlike stock Nightscout (which defaults AUTH_DEFAULT_ROLES to "readable" --
+// glucose data readable by anyone with the URL, no token needed), an unset
+// AUTH_DEFAULT_ROLES here defaults to "denied": every collection route
+// checks permissions *before* touching D1, so an unauthenticated request
+// never even queries for entries/treatments/etc., let alone returns them.
+// Deployments that want the old anonymous-read behavior back can still set
+// AUTH_DEFAULT_ROLES="readable" explicitly.
+const FALLBACK_DEFAULT_ROLE = "denied";
+
+export function defaultRoleNames(env: Env): string[] {
+  const raw = env.AUTH_DEFAULT_ROLES?.trim();
+  if (!raw) return [FALLBACK_DEFAULT_ROLE];
+  // Space-separated to match this codebase's other list-style vars (ENABLE,
+  // showPlugins) and stock Nightscout's own AUTH_DEFAULT_ROLES convention;
+  // commas accepted too since it's an easy thing to type out of habit.
+  const names = raw
+    .split(/[\s,]+/)
+    .map((n) => n.trim())
+    .filter(Boolean);
+  return names.length > 0 ? names : [FALLBACK_DEFAULT_ROLE];
+}
 
 /** Matches Nightscout's permission strings, e.g. pattern "api:*:read" or "*"
  * against a required permission "api:entries:read". Segments are separated
@@ -81,11 +101,8 @@ async function loadRolePermissions(db: D1Database, roleNames: string[]): Promise
   return Array.from(perms);
 }
 
-async function defaultPermissions(db: D1Database): Promise<string[]> {
-  const readable = await db.prepare("SELECT permissions FROM auth_roles WHERE name = ?").bind(DEFAULT_ROLE_NAME).first<{
-    permissions: string;
-  }>();
-  return readable ? JSON.parse(readable.permissions) : [];
+async function defaultPermissions(env: Env): Promise<string[]> {
+  return loadRolePermissions(env.DB, defaultRoleNames(env));
 }
 
 /** Deterministically derives a subject's access token from its id and the
@@ -124,7 +141,7 @@ async function buildResult(
   if (opts.authenticated) {
     return { ...opts, isMasterSecret: opts.isMasterSecret ?? false, usedDefaults: false };
   }
-  const defaults = await defaultPermissions(env.DB);
+  const defaults = await defaultPermissions(env);
   return { authenticated: false, isAdmin: false, subjectName: "anonymous", permissions: defaults, isMasterSecret: false, usedDefaults: true };
 }
 
@@ -133,8 +150,8 @@ async function buildResult(
  *  2. `Authorization: Bearer <jwt>` header wrapping a subject access token
  *  3. `api-secret` header or `token`/`secret` query param matching a
  *     subject's derived access token -> that subject's role permissions
- *  4. nothing presented -> anonymous, falls back to the "readable" default
- *     role (AUTH_DEFAULT_ROLES=readable), same as a fresh Nightscout install. */
+ *  4. nothing presented -> anonymous, falls back to whatever role(s)
+ *     AUTH_DEFAULT_ROLES names (comma-separated), or "denied" if unset. */
 export async function authenticate(c: Context<{ Bindings: Env }>): Promise<AuthResult> {
   const headerSecret = c.req.header("api-secret");
   const bearer = c.req.header("Authorization");
