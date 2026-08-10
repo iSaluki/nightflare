@@ -226,6 +226,49 @@ npm run dev
 To try the new dashboard locally without editing `wrangler.toml`:
 `npx wrangler dev --var NEW_UI:true`.
 
+## Updating a button-deployed repo
+
+Clicking **Deploy to Cloudflare** copies this repo's contents into a **brand-new, independent
+repository** in your GitHub account — it is *not* a GitHub fork. GitHub only records the
+fork/parent relationship when a repo is created via its own Fork feature (the "Fork" button, or
+`gh repo fork`); a repo created by pushing a copy of files into a freshly-created empty repo,
+which is what the button does, has no such relationship, and **there is no API or UI action that
+can retroactively attach one after the fact.** That's a GitHub platform limitation, not something
+this project (or git) can work around — so if you want the "Sync fork" button and the "forked
+from iSaluki/nightflare" badge specifically, the only way to get them is to delete your
+button-deployed repo and create a real fork instead (see below), reapplying any local changes
+you'd made on top of it.
+
+For the actual goal most people have — *pulling in updates from this repo* — you don't need any
+of that. Git doesn't care about GitHub's fork bookkeeping; add this repo as a second remote and
+merge from it like any other upstream:
+
+```bash
+git remote add upstream https://github.com/iSaluki/nightflare.git
+git fetch upstream
+git merge upstream/main        # or: git rebase upstream/main
+git push origin main
+```
+
+If you deployed via the button, pushing to `main` on your repo triggers Cloudflare's
+auto-deploy-on-push, so the merge above is also how you roll an update out — no need to click
+"Deploy to Cloudflare" again. Migrations run automatically on deploy (see `predeploy` in
+`package.json`), so any new ones land the same way.
+
+### If you specifically want a real GitHub fork instead
+
+1. Note anything you've customized in your existing repo (env vars in `wrangler.toml`, any code
+   changes) — you'll be re-applying those.
+2. Fork `iSaluki/nightflare` for real, via GitHub's "Fork" button on
+   [the repo page](https://github.com/iSaluki/nightflare) (or `gh repo fork iSaluki/nightflare`).
+3. Re-apply your customizations to the new fork (cherry-pick commits from your old repo, or just
+   redo the edits — usually just a few `wrangler.toml` var changes).
+4. Point Cloudflare at the new fork: your Worker's page in the dashboard -> Settings -> Build ->
+   disconnect the old repo, connect the new fork. Existing D1/KV/deployed data is untouched by
+   this — only which repo triggers future deploys changes.
+5. Delete the old button-created repo once you've confirmed the new fork deploys correctly (or
+   keep it around; it's harmless either way, just no longer connected to anything).
+
 ## Importing from an existing Nightscout instance
 
 Visit `/admin` → **Import from another Nightscout instance**, or call the API directly:
